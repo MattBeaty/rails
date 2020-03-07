@@ -22,6 +22,7 @@ require "models/dog"
 require "models/car"
 require "models/tyre"
 require "models/subscriber"
+require "models/non_primary_key"
 require "support/stubs/strong_parameters"
 
 class FinderTest < ActiveRecord::TestCase
@@ -396,15 +397,24 @@ class FinderTest < ActiveRecord::TestCase
   end
 
   def test_find_with_large_number
-    assert_raises(ActiveRecord::RecordNotFound) { Topic.find("9999999999999999999999999999999") }
+    Topic.send(:load_schema)
+    assert_no_queries do
+      assert_raises(ActiveRecord::RecordNotFound) { Topic.find("9999999999999999999999999999999") }
+    end
   end
 
   def test_find_by_with_large_number
-    assert_nil Topic.find_by(id: "9999999999999999999999999999999")
+    Topic.send(:load_schema)
+    assert_no_queries do
+      assert_nil Topic.find_by(id: "9999999999999999999999999999999")
+    end
   end
 
   def test_find_by_id_with_large_number
-    assert_nil Topic.find_by_id("9999999999999999999999999999999")
+    Topic.send(:load_schema)
+    assert_no_queries do
+      assert_nil Topic.find_by_id("9999999999999999999999999999999")
+    end
   end
 
   def test_find_on_relation_with_large_number
@@ -797,8 +807,37 @@ class FinderTest < ActiveRecord::TestCase
 
     assert_equal topics(:fifth), Topic.first
     assert_equal topics(:third), Topic.last
+
+    c = Topic.connection
+    assert_sql(/ORDER BY #{Regexp.escape(c.quote_table_name("topics.title"))} DESC, #{Regexp.escape(c.quote_table_name("topics.id"))} DESC LIMIT/i) {
+      Topic.last
+    }
   ensure
     Topic.implicit_order_column = old_implicit_order_column
+  end
+
+  def test_implicit_order_set_to_primary_key
+    old_implicit_order_column = Topic.implicit_order_column
+    Topic.implicit_order_column = "id"
+
+    c = Topic.connection
+    assert_sql(/ORDER BY #{Regexp.escape(c.quote_table_name("topics.id"))} DESC LIMIT/i) {
+      Topic.last
+    }
+  ensure
+    Topic.implicit_order_column = old_implicit_order_column
+  end
+
+  def test_implicit_order_for_model_without_primary_key
+    old_implicit_order_column = NonPrimaryKey.implicit_order_column
+    NonPrimaryKey.implicit_order_column = "created_at"
+
+    c = NonPrimaryKey.connection
+    assert_sql(/ORDER BY #{Regexp.escape(c.quote_table_name("non_primary_keys.created_at"))} DESC LIMIT/i) {
+      NonPrimaryKey.last
+    }
+  ensure
+    NonPrimaryKey.implicit_order_column = old_implicit_order_column
   end
 
   def test_take_and_first_and_last_with_integer_should_return_an_array

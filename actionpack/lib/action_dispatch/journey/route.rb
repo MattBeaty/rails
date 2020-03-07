@@ -87,7 +87,7 @@ module ActionDispatch
         end
       end
 
-      # Needed for `rails routes`. Picks up succinctly defined requirements
+      # Needed for `bin/rails routes`. Picks up succinctly defined requirements
       # for a route, for example route
       #
       #   get 'photo/:id', :controller => 'photos', :action => 'show',
@@ -110,18 +110,11 @@ module ActionDispatch
       end
 
       def score(supplied_keys)
-        required_keys = path.required_names
-
-        required_keys.each do |k|
+        path.required_names.each do |k|
           return -1 unless supplied_keys.include?(k)
         end
 
-        score = 0
-        path.names.each do |k|
-          score += 1 if supplied_keys.include?(k)
-        end
-
-        score + (required_defaults.length * 2)
+        (required_defaults.length * 2) + path.names.count { |k| supplied_keys.include?(k) }
       end
 
       def parts

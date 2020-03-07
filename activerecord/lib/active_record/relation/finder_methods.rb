@@ -284,9 +284,9 @@ module ActiveRecord
     # * Integer - Finds the record with this primary key.
     # * String - Finds the record with a primary key corresponding to this
     #   string (such as <tt>'5'</tt>).
-    # * Array - Finds the record that matches these +find+-style conditions
+    # * Array - Finds the record that matches these +where+-style conditions
     #   (such as <tt>['name LIKE ?', "%#{query}%"]</tt>).
-    # * Hash - Finds the record that matches these +find+-style conditions
+    # * Hash - Finds the record that matches these +where+-style conditions
     #   (such as <tt>{name: 'David'}</tt>).
     # * +false+ - Returns always +false+.
     # * No args - Returns +false+ if the relation is empty, +true+ otherwise.
@@ -560,7 +560,11 @@ module ActiveRecord
 
       def ordered_relation
         if order_values.empty? && (implicit_order_column || primary_key)
-          order(arel_attribute(implicit_order_column || primary_key).asc)
+          if implicit_order_column && primary_key && implicit_order_column != primary_key
+            order(arel_attribute(implicit_order_column).asc, arel_attribute(primary_key).asc)
+          else
+            order(arel_attribute(implicit_order_column || primary_key).asc)
+          end
         else
           self
         end

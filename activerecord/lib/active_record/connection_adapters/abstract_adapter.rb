@@ -47,9 +47,7 @@ module ActiveRecord
       set_callback :checkin, :after, :enable_lazy_transactions!
 
       def self.type_cast_config_to_integer(config)
-        if config.nil?
-          config
-        elsif config.is_a?(Integer)
+        if config.is_a?(Integer)
           config
         elsif SIMPLE_INT.match?(config)
           config.to_i
@@ -66,7 +64,11 @@ module ActiveRecord
         end
       end
 
+      DEFAULT_READ_QUERY = [:begin, :commit, :explain, :release, :rollback, :savepoint, :select, :with] # :nodoc:
+      private_constant :DEFAULT_READ_QUERY
+
       def self.build_read_query_regexp(*parts) # :nodoc:
+        parts += DEFAULT_READ_QUERY
         parts = parts.map { |part| /#{part}/i }
         /\A(?:[\(\s]|#{COMMENT_REGEX})*#{Regexp.union(*parts)}/
       end
@@ -128,12 +130,12 @@ module ActiveRecord
       def schema_migration # :nodoc:
         @schema_migration ||= begin
                                 conn = self
-                                spec_name = conn.pool.db_config.spec_name
-                                name = "#{spec_name}::SchemaMigration"
+                                name = conn.pool.db_config.name
+                                schema_migration_name = "#{name}::SchemaMigration"
 
                                 Class.new(ActiveRecord::SchemaMigration) do
-                                  define_singleton_method(:name) { name }
-                                  define_singleton_method(:to_s) { name }
+                                  define_singleton_method(:name) { schema_migration_name }
+                                  define_singleton_method(:to_s) { schema_migration_name }
 
                                   connection_handler.connection_pool_names.each do |pool_name|
                                     if conn.pool == connection_handler.retrieve_connection_pool(pool_name)
@@ -278,6 +280,10 @@ module ActiveRecord
       # sequence before the insert statement? If true, next_sequence_value
       # is called before each insert to set the record's primary key.
       def prefetch_primary_key?(table_name = nil)
+        false
+      end
+
+      def supports_partitioned_indexes?
         false
       end
 
@@ -680,7 +686,6 @@ module ActiveRecord
             binds:             binds,
             type_casted_binds: type_casted_binds,
             statement_name:    statement_name,
-            connection_id:     object_id,
             connection:        self) do
             @lock.synchronize do
               yield
